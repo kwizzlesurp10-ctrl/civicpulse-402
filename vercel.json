@@ -1,0 +1,15 @@
+{
+  "framework": "nextjs",
+  "regions": ["MSP1", "IAD1"],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET, OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Authorization, x402-authorization, x-payment-signature, Content-Type" },
+        { "key": "Access-Control-Expose-Headers", "value": "WWW-Authenticate, X-Verified-Payer" }
+      ]
+    }
+  ]
+}
