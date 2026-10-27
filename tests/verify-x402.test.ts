@@ -6,7 +6,7 @@ import {
   verifyEIP3009Authorization,
   BASE_USDC_ADDRESS,
   EXPECTED_PAYEE,
-} from '../app/api/v1/compliance/route';
+} from '../lib/verifyEip3009';
 
 async function runTests() {
   console.log('1. Testing RFC 7235 WWW-Authenticate x402 header parser...');
