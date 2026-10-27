@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/mcp.json",
+  "mcpServers": {
+    "civicpulse-402": {
+      "command": "npx",
+      "args": ["-y", "tsx", "src/mcp-server.ts"],
+      "env": {
+        "CIVICPULSE_API_URL": "https://civicpulse-402.vercel.app",
+        "NEXT_PUBLIC_PAY_TO_ADDRESS": "0xAB745e5F576667037696e78ba7dA28E193E4423D"
+      }
+    }
+  }
+}
