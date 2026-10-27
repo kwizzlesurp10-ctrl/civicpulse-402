@@ -1,6 +1,6 @@
 {
   "framework": "nextjs",
-  "regions": ["MSP1", "IAD1"],
+  "regions": ["ord1", "iad1"],
   "headers": [
     {
       "source": "/api/(.*)",
