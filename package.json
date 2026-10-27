@@ -8,6 +8,8 @@
     "build": "next build",
     "start": "next start",
     "test": "npx tsx tests/verify-x402.test.ts",
+    "test:sale-watch": "npx tsx tests/sale-watch.test.ts",
+    "sale-watch": "tsx scripts/sale-watch.ts",
     "mcp": "tsx src/mcp-server.ts"
   },
   "dependencies": {

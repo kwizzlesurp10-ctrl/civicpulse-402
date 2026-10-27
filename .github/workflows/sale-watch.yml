@@ -1,0 +1,58 @@
+name: Sale Watch - Base USDC Settlement Tracker
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    inputs:
+      start_block:
+        description: 'Optional manual start block override'
+        required: false
+        type: string
+
+concurrency:
+  group: sale-watch
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  index-settlements:
+    name: Poll Base USDC Settlements
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run sale-watch indexer
+        run: npx tsx scripts/sale-watch.ts
+        env:
+          BASE_RPC_URL: ${{ secrets.BASE_RPC_URL || '' }}
+          SALE_WATCH_START_BLOCK: ${{ github.event.inputs.start_block || '' }}
+
+      - name: Commit and push ledger updates
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          if [ -n "$(git status --porcelain docs/)" ]; then
+            echo "Ledger or cursor updates detected. Staging changes..."
+            git add docs/LIVE_LEDGER.md docs/.sale-watch-cursor.json
+            git commit -m "chore(sale-watch): sync ledger & cursor [skip ci]"
+            git pull --rebase origin main
+            git push origin main
+          else
+            echo "No updates detected. Ledger and cursor are up to date."
+          fi
