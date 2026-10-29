@@ -1,0 +1,32 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.kwizzlesurp10-ctrl/x402-mcp",
+  "title": "CivicPulse 402 Municipal Compliance Gateway",
+  "description": "Real-time municipal housing violations and parcel GIS audits via Base USDC ($0.01) x402.",
+  "version": "1.2.0",
+  "repository": {
+    "url": "https://github.com/kwizzlesurp10-ctrl/x402-mcp",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://civicpulse-402.vercel.app/mcp"
+    },
+    {
+      "type": "streamable-http",
+      "url": "https://x402-mcp.onrender.com/mcp"
+    }
+  ],
+  "x402": {
+    "version": "1.2",
+    "canonicalBazaarListing": "https://x402-mcp.onrender.com",
+    "network": "eip155:8453",
+    "chainId": 8453,
+    "token": "USDC",
+    "tokenContract": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "payTo": "0xAB745e5F576667037696e78ba7dA28E193E4423D",
+    "settlementScheme": "urn:x402:erc3009-transferWithAuthorization",
+    "priceUnits": "10000"
+  }
+}

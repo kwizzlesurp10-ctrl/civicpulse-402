@@ -1,77 +1,26 @@
 {
-  "version": 1,
-  "x402_version": 2,
-  "service": "civicpulse-402",
-  "name": "CivicPulse 402",
-  "description": "Autonomous Municipal Compliance & Real Estate API Gateway powered by x402 Micropayments on Base Mainnet.",
-  "base_url": "https://civicpulse-402.vercel.app",
-  "networks": [
-    "eip155:8453"
-  ],
-  "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-  "asset_symbol": "USDC",
+  "protocol": "x402-mcp/v1.2",
+  "serviceName": "CivicPulse 402 Municipal Compliance Gateway",
+  "canonicalOrigin": "https://x402-mcp.onrender.com",
+  "mcpEndpoint": "/mcp",
+  "operator": "SEVTECH / kwizzlesurp10-ctrl",
+  "network": "eip155:8453",
+  "chainId": 8453,
+  "token": {
+    "symbol": "USDC",
+    "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "decimals": 6
+  },
   "payTo": "0xAB745e5F576667037696e78ba7dA28E193E4423D",
-  "payment_header": "Authorization",
-  "challenge_header": "WWW-Authenticate",
-  "settlement_mode": "EIP-3009-transferWithAuthorization",
-  "discovery": {
-    "mcp_config": "https://civicpulse-402.vercel.app/mcp.json",
-    "x402_manifest": "https://civicpulse-402.vercel.app/.well-known/x402.json"
-  },
-  "mcp": {
-    "server": "src/mcp-server.ts",
-    "transport": "stdio",
-    "tools": [
-      {
-        "name": "probe_compliance_challenge",
-        "description": "Probe HTTP 402 challenge terms and settlement parameters without payment",
-        "paid": false
-      },
-      {
-        "name": "check_compliance",
-        "description": "Query Minneapolis violations/permits or Ramsey County parcel attributes with automated EIP-3009 payment",
-        "paid": true,
-        "priceUsdc": "0.01"
-      },
-      {
-        "name": "get_gateway_info",
-        "description": "Retrieve gateway metadata and discovery endpoints",
-        "paid": false
-      }
-    ]
-  },
-  "resources": [
-    "https://civicpulse-402.vercel.app/api/v1/compliance"
-  ],
-  "resource_details": [
+  "schemes": ["urn:x402:erc3009-transferWithAuthorization"],
+  "endpoints": [
     {
-      "url": "https://civicpulse-402.vercel.app/api/v1/compliance",
+      "path": "/api/v1/compliance",
       "method": "GET",
-      "price": "$0.01",
-      "price_usd": 0.01,
-      "atomic_amount": "10000",
-      "network": "eip155:8453",
-      "name": "compliance_query",
-      "what": "Real-time municipal compliance records: Minneapolis code violations and building permits, or Ramsey County property parcels.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "address": {
-            "type": "string",
-            "description": "Street address to inspect (e.g. '1700 Penn Ave N')"
-          },
-          "parcel_id": {
-            "type": "string",
-            "description": "Ramsey County PIN/Parcel ID (e.g. '04-29-23-41-0012')"
-          },
-          "jurisdiction": {
-            "type": "string",
-            "enum": ["minneapolis", "ramsey"],
-            "default": "minneapolis",
-            "description": "Target municipality or county jurisdiction"
-          }
-        }
-      }
+      "priceUnits": "10000",
+      "priceDisplay": "0.01 USDC",
+      "queryParams": ["address", "parcel_id", "jurisdiction"],
+      "description": "Real-time Minneapolis housing violations, building permits, and Ramsey County parcel verification."
     }
   ]
 }

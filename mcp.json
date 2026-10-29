@@ -1,13 +1,60 @@
 {
-  "$schema": "https://json.schemastore.org/mcp.json",
-  "mcpServers": {
-    "civicpulse-402": {
-      "command": "npx",
-      "args": ["-y", "tsx", "src/mcp-server.ts"],
-      "env": {
-        "CIVICPULSE_API_URL": "https://civicpulse-402.vercel.app",
-        "NEXT_PUBLIC_PAY_TO_ADDRESS": "0xAB745e5F576667037696e78ba7dA28E193E4423D"
+  "$schema": "https://modelcontextprotocol.io/schema/mcp.json",
+  "name": "civicpulse-402",
+  "version": "1.2.0",
+  "description": "Autonomous Minnesota Municipal Compliance, Housing Code Violations, and Parcel GIS API Gateway powered by Base USDC x402 Micropayments (EIP-3009).",
+  "author": "Keith Walter (kwizzlesurp10-ctrl)",
+  "license": "Apache-2.0",
+  "homepage": "https://x402-mcp.onrender.com",
+  "x402": {
+    "version": "1.2",
+    "network": "eip155:8453",
+    "chainId": 8453,
+    "token": "USDC",
+    "tokenContract": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "payTo": "0xAB745e5F576667037696e78ba7dA28E193E4423D",
+    "settlementScheme": "urn:x402:erc3009-transferWithAuthorization",
+    "defaultPriceUnits": "10000",
+    "defaultPriceFormatted": "0.01 USDC"
+  },
+  "tools": [
+    {
+      "name": "query_minneapolis_compliance",
+      "description": "Fetches real-time City of Minneapolis housing code violations, active repair orders, and building permits for a street address via ArcGIS Open Data. Costs 0.01 USDC on Base via x402.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "Minneapolis street address (e.g., '1700 Penn Ave N')"
+          },
+          "authorization": {
+            "type": "string",
+            "description": "Optional Base64 EIP-3009 Bearer token"
+          }
+        },
+        "required": ["address"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "query_ramsey_parcel_audit",
+      "description": "Queries Ramsey County Open GIS for parcel attributes, registered owner, property use class, and tax assessment valuation by PIN or site address. Costs 0.01 USDC on Base via x402.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parcel_id": {
+            "type": "string",
+            "description": "Ramsey County PIN (e.g., '04-29-23-41-0012') or address"
+          },
+          "authorization": {
+            "type": "string",
+            "description": "Optional Base64 EIP-3009 Bearer token"
+          }
+        },
+        "required": ["parcel_id"],
+        "additionalProperties": false
       }
     }
-  }
+  ]
 }

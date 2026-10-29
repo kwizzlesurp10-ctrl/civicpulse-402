@@ -1,0 +1,51 @@
+name: Warden Preflight & PayTo Parity Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mcp.json'
+      - 'server.json'
+      - 'public/.well-known/x402.json'
+      - 'app/api/**'
+      - 'app/mcp/**'
+      - 'lib/**'
+      - 'scripts/warden-health.ts'
+      - '.github/workflows/warden-health.yml'
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-x402-warden-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      EXPECTED_PAY_TO: '0xAB745e5F576667037696e78ba7dA28E193E4423D'
+      NEXT_PUBLIC_PAY_TO_ADDRESS: '0xAB745e5F576667037696e78ba7dA28E193E4423D'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+      - run: npm test
+      - run: npm run build
+      - name: Boot Ephemeral Server & Execute 5-Way Warden Parity Audit
+        run: |
+          npm run start -- -p 3000 &
+          SERVER_PID=$!
+          for i in $(seq 1 30); do
+            if curl -s -o /dev/null http://127.0.0.1:3000; then
+              break
+            fi
+            sleep 1
+          done
+          LIVE_GATEWAY_URL="http://127.0.0.1:3000" npx tsx scripts/warden-health.ts
+          kill $SERVER_PID || true

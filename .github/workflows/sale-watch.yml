@@ -1,58 +1,43 @@
-name: Sale Watch - Base USDC Settlement Tracker
+name: Base Mainnet x402 Sale-Watch
 
 on:
   schedule:
     - cron: '*/30 * * * *'
   workflow_dispatch:
-    inputs:
-      start_block:
-        description: 'Optional manual start block override'
-        required: false
-        type: string
 
 concurrency:
-  group: sale-watch
+  group: x402-sale-watch-ledger
   cancel-in-progress: false
 
 permissions:
   contents: write
 
 jobs:
-  index-settlements:
-    name: Poll Base USDC Settlements
+  poll-base-settlements:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '22'
           cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run sale-watch indexer
-        run: npx tsx scripts/sale-watch.ts
+      - run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+      - name: Poll Base Mainnet USDC Transfers & Update LIVE_LEDGER.md
         env:
-          BASE_RPC_URL: ${{ secrets.BASE_RPC_URL || '' }}
-          SALE_WATCH_START_BLOCK: ${{ github.event.inputs.start_block || '' }}
-
-      - name: Commit and push ledger updates
+          BASE_RPC_URL: ${{ secrets.BASE_RPC_URL || 'https://mainnet.base.org' }}
+          NEXT_PUBLIC_PAY_TO_ADDRESS: '0xAB745e5F576667037696e78ba7dA28E193E4423D'
+        run: npx tsx scripts/sale-watch.ts
+      - name: Commit & Push Ledger Updates
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
-          if [ -n "$(git status --porcelain docs/)" ]; then
-            echo "Ledger or cursor updates detected. Staging changes..."
-            git add docs/LIVE_LEDGER.md docs/.sale-watch-cursor.json
-            git commit -m "chore(sale-watch): sync ledger & cursor [skip ci]"
-            git pull --rebase origin main
-            git push origin main
-          else
-            echo "No updates detected. Ledger and cursor are up to date."
+          git config user.name "x402-sale-watch[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/LIVE_LEDGER.md docs/.sale-watch-cursor.json
+          if git diff --staged --quiet; then
+            exit 0
           fi
+          git commit -m "chore(ledger): sync Base Mainnet x402 sale-watch state [skip ci]"
+          git pull --rebase origin main
+          git push origin HEAD:main
