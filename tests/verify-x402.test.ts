@@ -83,6 +83,62 @@ async function runTests() {
   assert.strictEqual(badResult.valid, false);
   console.log(`   [PASS] Payee mismatch blocked: ${badResult.error}`);
 
+  console.log('4. Testing ReceiveWithAuthorization support...');
+  const recvNonce = toHex(crypto.getRandomValues(new Uint8Array(32)));
+  const recvSignature = await account.signTypedData({
+    domain: {
+      name: 'USD Coin',
+      version: '2',
+      chainId: 8453,
+      verifyingContract: BASE_USDC_ADDRESS,
+    },
+    types: {
+      ReceiveWithAuthorization: [
+        { name: 'from', type: 'address' },
+        { name: 'to', type: 'address' },
+        { name: 'value', type: 'uint256' },
+        { name: 'validAfter', type: 'uint256' },
+        { name: 'validBefore', type: 'uint256' },
+        { name: 'nonce', type: 'bytes32' },
+      ],
+    },
+    primaryType: 'ReceiveWithAuthorization',
+    message: {
+      from: account.address,
+      to: EXPECTED_PAYEE,
+      value,
+      validAfter: BigInt(validAfter),
+      validBefore: BigInt(validBefore),
+      nonce: recvNonce,
+    },
+  });
+
+  const recvPayload = {
+    from: account.address,
+    to: EXPECTED_PAYEE,
+    value: value.toString(),
+    validAfter,
+    validBefore,
+    nonce: recvNonce,
+    signature: recvSignature,
+    primaryType: 'ReceiveWithAuthorization' as const,
+  };
+  const recvBearer = `Bearer ${Buffer.from(JSON.stringify(recvPayload)).toString('base64')}`;
+  const recvResult = await verifyEIP3009Authorization(recvBearer, true);
+  assert.strictEqual(recvResult.valid, true, `Expected valid ReceiveWithAuthorization, got: ${recvResult.error}`);
+  console.log('   [PASS] ReceiveWithAuthorization signature verified successfully.');
+
+  console.log('5. Testing FiatTokenV2 boundary check (validAfter >= now rejected)...');
+  const futurePayload = {
+    ...payload,
+    validAfter: Math.floor(Date.now() / 1000) + 100,
+  };
+  const futureBearer = `Bearer ${Buffer.from(JSON.stringify(futurePayload)).toString('base64')}`;
+  const futureResult = await verifyEIP3009Authorization(futureBearer, true);
+  assert.strictEqual(futureResult.valid, false);
+  assert.match(futureResult.error || '', /not yet active/i);
+  console.log(`   [PASS] Future validAfter rejected: ${futureResult.error}`);
+
   console.log('\nAll x402 verification & cryptographic tests passed!');
 }
 

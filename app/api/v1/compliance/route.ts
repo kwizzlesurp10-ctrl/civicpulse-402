@@ -101,7 +101,7 @@ export async function verifyEIP3009Authorization(
     const validAfterNum = Number(validAfter);
     const validBeforeNum = Number(validBefore);
 
-    if (now < validAfterNum) {
+    if (now <= validAfterNum) {
       return { valid: false, error: 'Authorization signature is not yet active.' };
     }
     if (now >= validBeforeNum) {

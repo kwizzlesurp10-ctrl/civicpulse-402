@@ -67,6 +67,7 @@ export interface EIP3009Payload {
   validBefore: number | string;
   nonce: Hex;
   signature: Hex;
+  type?: 'TransferWithAuthorization' | 'ReceiveWithAuthorization';
   primaryType?: 'TransferWithAuthorization' | 'ReceiveWithAuthorization';
 }
 
@@ -76,6 +77,7 @@ export async function verifyEIP3009Authorization(
 ): Promise<{
   valid: boolean;
   signer?: Address;
+  payload?: EIP3009Payload;
   parsedPayload?: EIP3009Payload;
   error?: string;
 }> {
@@ -90,7 +92,7 @@ export async function verifyEIP3009Authorization(
     }
 
     const { from, to, value, validAfter, validBefore, nonce, signature } = payload;
-    const primaryType = payload.primaryType || 'TransferWithAuthorization';
+    const primaryType = payload.type || payload.primaryType || 'TransferWithAuthorization';
 
     if (!isAddress(from) || !isAddress(to) || !signature || !nonce) {
       return { valid: false, error: 'Malformed EIP-3009 payload structure.' };
@@ -115,8 +117,14 @@ export async function verifyEIP3009Authorization(
     const validAfterNum = Number(validAfter);
     const validBeforeNum = Number(validBefore);
 
-    if (now < validAfterNum) {
-      return { valid: false, error: 'Authorization signature is not yet active.' };
+    if (isNaN(validAfterNum) || isNaN(validBeforeNum)) {
+      return { valid: false, error: 'Invalid timestamp format in authorization.' };
+    }
+    if (validAfterNum >= validBeforeNum) {
+      return { valid: false, error: 'Invalid authorization window: validAfter must be strictly less than validBefore.' };
+    }
+    if (now <= validAfterNum) {
+      return { valid: false, error: 'Authorization signature is not yet active (now <= validAfter).' };
     }
     if (now >= validBeforeNum) {
       return { valid: false, error: 'Authorization signature has expired.' };
@@ -155,7 +163,7 @@ export async function verifyEIP3009Authorization(
       return { valid: false, error: 'Cryptographic signature verification failed.' };
     }
 
-    return { valid: true, signer: from, parsedPayload: payload };
+    return { valid: true, signer: from, payload, parsedPayload: payload };
   } catch (err: any) {
     return { valid: false, error: `Signature verification exception: ${err?.message}` };
   }
