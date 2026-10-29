@@ -31,6 +31,14 @@ export const eip3009Types = {
     { name: 'validBefore', type: 'uint256' },
     { name: 'nonce', type: 'bytes32' },
   ],
+  ReceiveWithAuthorization: [
+    { name: 'from', type: 'address' },
+    { name: 'to', type: 'address' },
+    { name: 'value', type: 'uint256' },
+    { name: 'validAfter', type: 'uint256' },
+    { name: 'validBefore', type: 'uint256' },
+    { name: 'nonce', type: 'bytes32' },
+  ],
 } as const;
 
 const baseClient = createPublicClient({
@@ -59,6 +67,7 @@ export interface EIP3009Payload {
   validBefore: number | string;
   nonce: Hex;
   signature: Hex;
+  primaryType?: 'TransferWithAuthorization' | 'ReceiveWithAuthorization';
 }
 
 export async function verifyEIP3009Authorization(
@@ -67,6 +76,7 @@ export async function verifyEIP3009Authorization(
 ): Promise<{
   valid: boolean;
   signer?: Address;
+  parsedPayload?: EIP3009Payload;
   error?: string;
 }> {
   try {
@@ -80,6 +90,7 @@ export async function verifyEIP3009Authorization(
     }
 
     const { from, to, value, validAfter, validBefore, nonce, signature } = payload;
+    const primaryType = payload.primaryType || 'TransferWithAuthorization';
 
     if (!isAddress(from) || !isAddress(to) || !signature || !nonce) {
       return { valid: false, error: 'Malformed EIP-3009 payload structure.' };
@@ -127,8 +138,8 @@ export async function verifyEIP3009Authorization(
     const isValidSignature = await verifyTypedData({
       address: from,
       domain: usdcDomain,
-      types: eip3009Types,
-      primaryType: 'TransferWithAuthorization',
+      types: { [primaryType]: eip3009Types[primaryType] },
+      primaryType,
       message: {
         from,
         to,
@@ -144,7 +155,7 @@ export async function verifyEIP3009Authorization(
       return { valid: false, error: 'Cryptographic signature verification failed.' };
     }
 
-    return { valid: true, signer: from };
+    return { valid: true, signer: from, parsedPayload: payload };
   } catch (err: any) {
     return { valid: false, error: `Signature verification exception: ${err?.message}` };
   }
