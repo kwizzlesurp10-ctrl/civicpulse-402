@@ -9,16 +9,20 @@
     "build": "next build",
     "start": "next start",
     "test": "npx tsx tests/verify-x402.test.ts",
+    "test:sale-watch": "npx tsx tests/sale-watch.test.ts",
     "sale-watch": "npx tsx scripts/sale-watch.ts",
-    "warden-health": "npx tsx scripts/warden-health.ts"
+    "warden-health": "npx tsx scripts/warden-health.ts",
+    "mcp": "npx tsx src/mcp-server.ts"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@tanstack/react-query": "^5.59.0",
     "next": "^15.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "viem": "^2.21.0",
-    "wagmi": "^2.12.0"
+    "wagmi": "^2.12.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
