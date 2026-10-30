@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
     paths:
+      - 'package.json'
       - 'mcp.json'
       - 'server.json'
       - 'public/.well-known/x402.json'
