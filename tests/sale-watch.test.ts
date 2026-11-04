@@ -11,6 +11,10 @@ import {
   loadCursor,
   saveCursor,
   runSaleWatch,
+  isBlockRangeLimitError,
+  isTransientRpcError,
+  fetchUsdcTransferLogsAdaptive,
+  transferEventAbi,
   CANONICAL_CHAIN_ID,
   BASE_USDC_ADDRESS,
   EXPECTED_PAYEE,
@@ -87,6 +91,48 @@ async function runTestSuite() {
   // Test 1.6: Invalid chunk size throws
   assert.throws(() => calculateBlockRanges(100n, 200n, 0n), /maxChunkSize must be greater than 0/);
   console.log('  ✔ Passed: calculateBlockRanges rejects non-positive chunk size');
+
+  // ---------------------------------------------------------------------------
+  // Suite 1b: RPC error classification & adaptive log splitting
+  // ---------------------------------------------------------------------------
+  console.log('\n▶ Suite 1b: Adaptive getLogs error handling');
+
+  assert(isBlockRangeLimitError(new Error('eth_getLogs is limited to 0 - 50 blocks range')));
+  assert(isBlockRangeLimitError({ message: 'max block range exceeded' }));
+  assert(!isBlockRangeLimitError(new Error('execution reverted')));
+  console.log('  ✔ Passed: isBlockRangeLimitError detects provider range rejections');
+
+  assert(isTransientRpcError(new Error('429 Too Many Requests')));
+  assert(isTransientRpcError(new Error('rate limit exceeded')));
+  assert(!isTransientRpcError(new Error('eth_getLogs is limited to 0 - 50 blocks range')));
+  console.log('  ✔ Passed: isTransientRpcError detects retryable failures');
+
+  const maxRange = 50n;
+  let callCount = 0;
+  const mockClient = {
+    async getLogs(params: { fromBlock: bigint; toBlock: bigint }) {
+      callCount += 1;
+      const span = params.toBlock - params.fromBlock + 1n;
+      if (span > maxRange) {
+        throw new Error('eth_getLogs is limited to 0 - 50 blocks range');
+      }
+      return [{ transactionHash: `0x${callCount.toString().padStart(64, '0')}` }];
+    },
+  } as unknown as import('../lib/saleWatch').ReturnType<typeof import('../lib/saleWatch').createBaseClient>;
+
+  const adaptiveLogs = await fetchUsdcTransferLogsAdaptive(
+    mockClient,
+    {
+      address: BASE_USDC_ADDRESS,
+      event: transferEventAbi,
+      args: { to: EXPECTED_PAYEE },
+    },
+    1n,
+    200n
+  );
+  assert(adaptiveLogs.length > 0);
+  assert(callCount > 4, 'Adaptive fetch should split oversized ranges into multiple getLogs calls');
+  console.log('  ✔ Passed: fetchUsdcTransferLogsAdaptive splits on block-range limit errors');
 
   // ---------------------------------------------------------------------------
   // Suite 2: Deduplication and Row Formatting Tests
