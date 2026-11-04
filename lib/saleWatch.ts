@@ -16,8 +16,13 @@ export const CANONICAL_NETWORK = 'eip155:8453';
 export const BASE_USDC_ADDRESS: Address = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 export const EXPECTED_PAYEE: Address = '0xAB745e5F576667037696e78ba7dA28E193E4423D';
 
+/** Planned scan segment size; adaptive getLogs may split further when RPC rejects the range. */
 export const DEFAULT_CHUNK_SIZE = 2000n;
+/** Hard ceiling for a single planned segment (adaptive fetch still shrinks on provider errors). */
+export const DEFAULT_MAX_LOG_RANGE_BLOCKS = 50n;
+export const DEFAULT_MAX_BLOCKS_PER_RUN = 30_000n;
 export const DEFAULT_CONFIRMATION_LAG = 5n;
+export const LOG_FETCH_MAX_ATTEMPTS = 5;
 export const DEFAULT_CURSOR_PATH = 'docs/.sale-watch-cursor.json';
 export const DEFAULT_LEDGER_PATH = 'docs/LIVE_LEDGER.md';
 
@@ -61,6 +66,7 @@ export interface SaleWatchConfig {
   cursorPath?: string;
   ledgerPath?: string;
   chunkSize?: bigint;
+  maxBlocksPerRun?: bigint;
   confirmations?: bigint;
   startBlock?: bigint;
   endBlock?: bigint;
@@ -89,23 +95,149 @@ Network: \`${CANONICAL_NETWORK}\` (Base Mainnet)
 |---|---|---|---|---|---|---|
 `;
 
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return `${error.name}: ${error.message}`;
+  }
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const msg = (error as { message: unknown }).message;
+    if (typeof msg === 'string') {
+      return msg;
+    }
+  }
+  return String(error);
+}
+
+export function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** True when the RPC refuses the requested eth_getLogs block span. */
+export function isBlockRangeLimitError(error: unknown): boolean {
+  const message = errorMessage(error).toLowerCase();
+  return (
+    message.includes('eth_getlogs is limited') ||
+    message.includes('block range') ||
+    message.includes('range too large') ||
+    message.includes('query returned more than') ||
+    message.includes('max block range') ||
+    message.includes('maximum block range') ||
+    (message.includes('limited to') && message.includes('block'))
+  );
+}
+
+/** True for rate limits and other errors worth retrying with backoff. */
+export function isTransientRpcError(error: unknown): boolean {
+  const message = errorMessage(error).toLowerCase();
+  return (
+    message.includes('rate limit') ||
+    message.includes('too many requests') ||
+    message.includes('429') ||
+    message.includes('timeout') ||
+    message.includes('timed out') ||
+    message.includes('econnreset') ||
+    message.includes('econnrefused') ||
+    message.includes('503') ||
+    message.includes('502') ||
+    message.includes('504') ||
+    message.includes('temporarily unavailable') ||
+    message.includes('over rate limit')
+  );
+}
+
+export interface GetLogsAdaptiveParams {
+  address: Address;
+  event: typeof transferEventAbi;
+  args: { to: Address };
+}
+
 /**
  * Creates a Viem public client configured with resilient RPC transport fallbacks.
  */
 export function createBaseClient(rpcUrl?: string) {
   const transports = [];
-  if (rpcUrl) {
-    transports.push(http(rpcUrl, { retryCount: 2 }));
+  const explicit = rpcUrl || process.env.BASE_RPC_URL;
+  if (explicit) {
+    transports.push(http(explicit, { retryCount: 3, timeout: 30_000 }));
+  }
+  if (!explicit || explicit !== 'https://mainnet.base.org') {
+    transports.push(http('https://mainnet.base.org', { retryCount: 3, timeout: 30_000 }));
   }
   transports.push(
-    http(process.env.BASE_RPC_URL || 'https://mainnet.base.org', { retryCount: 2 }),
-    http('https://base-rpc.publicnode.com', { retryCount: 3 })
+    http('https://base.llamarpc.com', { retryCount: 3, timeout: 30_000 }),
+    http('https://base-rpc.publicnode.com', { retryCount: 3, timeout: 30_000 }),
+    http('https://1rpc.io/base', { retryCount: 2, timeout: 30_000 })
   );
 
   return createPublicClient({
     chain: base,
-    transport: fallback(transports),
+    transport: fallback(transports, { rank: false }),
   });
+}
+
+type SaleWatchPublicClient = ReturnType<typeof createBaseClient>;
+
+async function getLogsWithRetry(
+  client: SaleWatchPublicClient,
+  params: {
+    address: Address;
+    event: typeof transferEventAbi;
+    args: { to: Address };
+    fromBlock: bigint;
+    toBlock: bigint;
+  },
+  maxAttempts: number = LOG_FETCH_MAX_ATTEMPTS
+) {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      return await client.getLogs(params);
+    } catch (err) {
+      lastError = err;
+      if (isBlockRangeLimitError(err)) {
+        throw err;
+      }
+      if (isTransientRpcError(err) && attempt < maxAttempts - 1) {
+        const delayMs = Math.min(750 * 2 ** attempt, 8_000);
+        await sleep(delayMs);
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastError;
+}
+
+/**
+ * Fetches USDC Transfer logs for a block range, starting at the full span and
+ * recursively halving when the provider rejects the range as too large.
+ */
+export async function fetchUsdcTransferLogsAdaptive(
+  client: SaleWatchPublicClient,
+  logFilter: GetLogsAdaptiveParams,
+  fromBlock: bigint,
+  toBlock: bigint
+): Promise<Awaited<ReturnType<SaleWatchPublicClient['getLogs']>>> {
+  if (fromBlock > toBlock) {
+    return [];
+  }
+
+  try {
+    return await getLogsWithRetry(client, {
+      ...logFilter,
+      fromBlock,
+      toBlock,
+    });
+  } catch (err) {
+    if (!isBlockRangeLimitError(err) || fromBlock === toBlock) {
+      throw err;
+    }
+    const span = toBlock - fromBlock + 1n;
+    const mid = fromBlock + span / 2n - 1n;
+    const left = await fetchUsdcTransferLogsAdaptive(client, logFilter, fromBlock, mid);
+    const right = await fetchUsdcTransferLogsAdaptive(client, logFilter, mid + 1n, toBlock);
+    return [...left, ...right];
+  }
 }
 
 /**
@@ -222,9 +354,27 @@ export async function loadCursor(cursorPath: string, fallbackBlock?: bigint): Pr
   if (fs.existsSync(resolvedPath)) {
     try {
       const raw = await fs.promises.readFile(resolvedPath, 'utf-8');
-      const parsed = JSON.parse(raw);
+      const parsed = JSON.parse(raw) as Partial<CursorState> & {
+        lastScannedBlock?: string;
+        payTo?: string;
+      };
       if (typeof parsed.lastBlock === 'number' && parsed.lastBlock >= 0) {
         return parsed as CursorState;
+      }
+      if (typeof parsed.lastScannedBlock === 'string' && parsed.lastScannedBlock.length > 0) {
+        const legacyBlock = Number(BigInt(parsed.lastScannedBlock));
+        return {
+          version: '1.0.0',
+          chainId: CANONICAL_CHAIN_ID,
+          contractAddress: BASE_USDC_ADDRESS,
+          payeeAddress: EXPECTED_PAYEE,
+          lastBlock: legacyBlock,
+          lastSyncedAt:
+            typeof (parsed as { updatedAt?: string }).updatedAt === 'string'
+              ? (parsed as { updatedAt: string }).updatedAt
+              : new Date().toISOString(),
+          totalSettlementsFound: 0,
+        };
       }
     } catch {
       // In case of corrupt JSON, fall through to fallback
@@ -266,6 +416,11 @@ export async function runSaleWatch(config?: SaleWatchConfig): Promise<SaleWatchR
   const ledgerPath = config?.ledgerPath ?? path.resolve(process.cwd(), DEFAULT_LEDGER_PATH);
   const maxChunkSize = config?.chunkSize ?? DEFAULT_CHUNK_SIZE;
   const confirmations = config?.confirmations ?? DEFAULT_CONFIRMATION_LAG;
+  const maxBlocksPerRun =
+    config?.maxBlocksPerRun ??
+    (process.env.SALE_WATCH_MAX_BLOCKS_PER_RUN
+      ? BigInt(process.env.SALE_WATCH_MAX_BLOCKS_PER_RUN)
+      : DEFAULT_MAX_BLOCKS_PER_RUN);
 
   const client = createBaseClient(config?.rpcUrl);
 
@@ -280,7 +435,7 @@ export async function runSaleWatch(config?: SaleWatchConfig): Promise<SaleWatchR
   const latestBlockOnChain = await client.getBlockNumber();
   const safeTargetBlock =
     latestBlockOnChain > confirmations ? latestBlockOnChain - confirmations : latestBlockOnChain;
-  const toBlock = config?.endBlock ?? safeTargetBlock;
+  let scanToBlock = config?.endBlock ?? safeTargetBlock;
 
   // 3. Determine starting block height
   let fromBlock: bigint;
@@ -305,13 +460,11 @@ export async function runSaleWatch(config?: SaleWatchConfig): Promise<SaleWatchR
   logger(`[sale-watch] Canonical network: ${CANONICAL_NETWORK} (Base Mainnet)`);
   logger(`[sale-watch] USDC Contract: ${usdcAddress}`);
   logger(`[sale-watch] Payee: ${payToAddress}`);
-  logger(`[sale-watch] Scan range: blocks ${fromBlock} -> ${toBlock} (dryRun: ${dryRun})`);
-
-  if (fromBlock > toBlock) {
-    logger(`[sale-watch] Up-to-date: fromBlock (${fromBlock}) > toBlock (${toBlock}).`);
+  if (fromBlock > scanToBlock) {
+    logger(`[sale-watch] Up-to-date: fromBlock (${fromBlock}) > toBlock (${scanToBlock}).`);
     return {
       fromBlock,
-      toBlock,
+      toBlock: scanToBlock,
       scannedBlocks: 0n,
       chunksCount: 0,
       eventsFound: 0,
@@ -320,6 +473,23 @@ export async function runSaleWatch(config?: SaleWatchConfig): Promise<SaleWatchR
       cursorUpdatedTo: BigInt(cursor.lastBlock),
     };
   }
+
+  const blocksBehind = scanToBlock - fromBlock + 1n;
+  if (maxBlocksPerRun > 0n && blocksBehind > maxBlocksPerRun) {
+    scanToBlock = fromBlock + maxBlocksPerRun - 1n;
+    logger(
+      `[sale-watch] Capping this run to ${maxBlocksPerRun.toString()} blocks (${fromBlock.toString()} -> ${scanToBlock.toString()}); will resume on next run.`
+    );
+  }
+
+  const toBlock = scanToBlock;
+  logger(`[sale-watch] Scan range: blocks ${fromBlock} -> ${toBlock} (dryRun: ${dryRun})`);
+
+  const logFilter: GetLogsAdaptiveParams = {
+    address: usdcAddress,
+    event: transferEventAbi,
+    args: { to: payToAddress },
+  };
 
   const chunks = calculateBlockRanges(fromBlock, toBlock, maxChunkSize);
   logger(`[sale-watch] Split into ${chunks.length} chunks (maxChunkSize: ${maxChunkSize})`);
@@ -333,13 +503,7 @@ export async function runSaleWatch(config?: SaleWatchConfig): Promise<SaleWatchR
     logger(`[sale-watch] Scanning chunk ${i + 1}/${chunks.length}: [${chunk.from}..${chunk.to}]`);
 
     // Ingest ERC-20 Transfer events to payee
-    const logs = await client.getLogs({
-      address: usdcAddress,
-      event: transferEventAbi,
-      args: { to: payToAddress },
-      fromBlock: chunk.from,
-      toBlock: chunk.to,
-    });
+    const logs = await fetchUsdcTransferLogsAdaptive(client, logFilter, chunk.from, chunk.to);
 
     const candidateEvents: SettlementEvent[] = [];
 
