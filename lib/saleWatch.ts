@@ -6,6 +6,7 @@ import {
   http,
   parseAbiItem,
   type Address,
+  type GetLogsReturnType,
   type Hex,
 } from 'viem';
 import { base } from 'viem/chains';
@@ -177,6 +178,9 @@ export function createBaseClient(rpcUrl?: string) {
 
 type SaleWatchPublicClient = ReturnType<typeof createBaseClient>;
 
+export type UsdcTransferLog = GetLogsReturnType<typeof transferEventAbi>[number];
+export type UsdcTransferLogs = GetLogsReturnType<typeof transferEventAbi>;
+
 async function getLogsWithRetry(
   client: SaleWatchPublicClient,
   params: {
@@ -187,7 +191,7 @@ async function getLogsWithRetry(
     toBlock: bigint;
   },
   maxAttempts: number = LOG_FETCH_MAX_ATTEMPTS
-) {
+): Promise<UsdcTransferLogs> {
   let lastError: unknown;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
@@ -217,7 +221,7 @@ export async function fetchUsdcTransferLogsAdaptive(
   logFilter: GetLogsAdaptiveParams,
   fromBlock: bigint,
   toBlock: bigint
-): Promise<Awaited<ReturnType<SaleWatchPublicClient['getLogs']>>> {
+): Promise<UsdcTransferLogs> {
   if (fromBlock > toBlock) {
     return [];
   }
