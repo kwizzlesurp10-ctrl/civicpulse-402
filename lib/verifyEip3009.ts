@@ -8,10 +8,11 @@ import {
 } from 'viem';
 import { base } from 'viem/chains';
 
+import { EXPECTED_PAYEE, isRetiredPayee } from './x402PayTo';
+
+export { EXPECTED_PAYEE } from './x402PayTo';
+
 export const BASE_USDC_ADDRESS: Address = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
-export const EXPECTED_PAYEE: Address =
-  (process.env.NEXT_PUBLIC_PAY_TO_ADDRESS as Address) ||
-  '0xAB745e5F576667037696e78ba7dA28E193E4423D';
 
 export const REQUIRED_AMOUNT_USDC_UNITS = 10_000n;
 
@@ -96,6 +97,13 @@ export async function verifyEIP3009Authorization(
 
     if (!isAddress(from) || !isAddress(to) || !signature || !nonce) {
       return { valid: false, error: 'Malformed EIP-3009 payload structure.' };
+    }
+
+    if (isRetiredPayee(to)) {
+      return {
+        valid: false,
+        error: `Retired payee address rejected: ${to}`,
+      };
     }
 
     if (to.toLowerCase() !== EXPECTED_PAYEE.toLowerCase()) {

@@ -8,7 +8,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "npx tsx tests/verify-x402.test.ts",
+    "test": "npx tsx tests/x402-payto.test.ts && npx tsx tests/verify-x402.test.ts",
     "test:sale-watch": "npx tsx tests/sale-watch.test.ts",
     "sale-watch": "npx tsx scripts/sale-watch.ts",
     "warden-health": "npx tsx scripts/warden-health.ts",

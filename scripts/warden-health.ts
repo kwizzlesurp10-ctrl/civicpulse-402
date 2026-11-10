@@ -7,10 +7,9 @@ import {
   EXPECTED_PAYEE,
   BASE_USDC_ADDRESS,
 } from '../app/api/v1/compliance/route';
+import { resolveX402PayTo } from '../lib/x402PayTo';
 
-const CANONICAL_PAY_TO: Address = getAddress(
-  process.env.EXPECTED_PAY_TO || '0xAB745e5F576667037696e78ba7dA28E193E4423D'
-);
+const CANONICAL_PAY_TO: Address = resolveX402PayTo();
 const CANONICAL_USDC: Address = getAddress('0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913');
 const CANONICAL_CHAIN_ID = 8453;
 const CANONICAL_CAIP2 = 'eip155:8453';

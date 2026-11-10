@@ -2,13 +2,31 @@ import assert from 'node:assert';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { toHex } from 'viem';
 import { parse402Header } from '../lib/x402Fetch';
+import { getAddress } from 'viem';
 import {
   verifyEIP3009Authorization,
   BASE_USDC_ADDRESS,
   EXPECTED_PAYEE,
 } from '../app/api/v1/compliance/route';
+import {
+  DEFAULT_X402_PAY_TO,
+  RETIRED_X402_PAY_TO,
+} from '../lib/x402PayTo';
 
 async function runTests() {
+  console.log('0. Canonical advertised payTo...');
+  assert.strictEqual(
+    getAddress(EXPECTED_PAYEE),
+    getAddress(DEFAULT_X402_PAY_TO),
+    'Challenge payTo must be Keith Base Account'
+  );
+  assert.notStrictEqual(
+    getAddress(EXPECTED_PAYEE),
+    getAddress(RETIRED_X402_PAY_TO),
+    'Retired payTo must not be advertised'
+  );
+  console.log(`   [PASS] EXPECTED_PAYEE=${EXPECTED_PAYEE}`);
+
   console.log('1. Testing RFC 7235 WWW-Authenticate x402 header parser...');
   const sampleHeader = `x402 realm="CivicPulse-Base", token="USDC", contract="${BASE_USDC_ADDRESS}", chain="8453", payTo="${EXPECTED_PAYEE}", amount="10000"`;
   const parsed = parse402Header(sampleHeader);
@@ -82,6 +100,13 @@ async function runTests() {
 
   assert.strictEqual(badResult.valid, false);
   console.log(`   [PASS] Payee mismatch blocked: ${badResult.error}`);
+
+  const retiredPayload = { ...payload, to: RETIRED_X402_PAY_TO };
+  const retiredBearer = `Bearer ${Buffer.from(JSON.stringify(retiredPayload)).toString('base64')}`;
+  const retiredResult = await verifyEIP3009Authorization(retiredBearer, true);
+  assert.strictEqual(retiredResult.valid, false);
+  assert.match(retiredResult.error || '', /Retired payee/i);
+  console.log(`   [PASS] Retired operator payTo blocked: ${retiredResult.error}`);
 
   console.log('4. Testing ReceiveWithAuthorization support...');
   const recvNonce = toHex(crypto.getRandomValues(new Uint8Array(32)));

@@ -8,6 +8,7 @@ import {
   settleEIP3009OnChain,
 } from '@/lib/relayer';
 import { appendSettlementToLedger } from '@/lib/ledger';
+import { isRetiredPayee } from '@/lib/x402PayTo';
 
 export { BASE_USDC_ADDRESS, EXPECTED_PAYEE };
 
@@ -80,6 +81,13 @@ export async function verifyEIP3009Authorization(
 
     if (!isAddress(from) || !isAddress(to) || !signature || !nonce) {
       return { valid: false, error: 'Malformed EIP-3009 payload structure.' };
+    }
+
+    if (isRetiredPayee(to)) {
+      return {
+        valid: false,
+        error: `Retired payee address rejected: ${to}`,
+      };
     }
 
     if (to.toLowerCase() !== EXPECTED_PAYEE.toLowerCase()) {
