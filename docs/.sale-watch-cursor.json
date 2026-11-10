@@ -2,7 +2,11 @@
   "version": "1.0.0",
   "chainId": 8453,
   "contractAddress": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+<<<<<<< HEAD
+  "payeeAddress": "0x0d25A44f74868eCE53B305C97139CF4B62963410",
+=======
   "payeeAddress": "0xAB745e5F576667037696e78ba7dA28E193E4423D",
+>>>>>>> origin/main
   "lastBlock": 55540544,
   "lastSyncedAt": "2026-11-10T08:14:59.677Z",
   "totalSettlementsFound": 0

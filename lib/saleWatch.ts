@@ -10,12 +10,15 @@ import {
   type Hex,
 } from 'viem';
 import { base } from 'viem/chains';
+import { EXPECTED_PAYEE } from './x402PayTo';
+
+export { EXPECTED_PAYEE } from './x402PayTo';
 
 // Canonical Invariants
 export const CANONICAL_CHAIN_ID = 8453;
 export const CANONICAL_NETWORK = 'eip155:8453';
+
 export const BASE_USDC_ADDRESS: Address = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
-export const EXPECTED_PAYEE: Address = '0xAB745e5F576667037696e78ba7dA28E193E4423D';
 
 /** Planned scan segment size; adaptive getLogs may split further when RPC rejects the range. */
 export const DEFAULT_CHUNK_SIZE = 2000n;

@@ -30,7 +30,7 @@ const MCP_TOOLS = [
         authorization: {
           type: 'string',
           description:
-            'Base64-encoded EIP-3009 TransferWithAuthorization Bearer token (payTo: 0xAB745e5F576667037696e78ba7dA28E193E4423D, value: 10000, chainId: 8453).',
+            `Base64-encoded EIP-3009 TransferWithAuthorization Bearer token (payTo: ${EXPECTED_PAYEE}, value: 10000, chainId: 8453).`,
         },
       },
       required: ['address'],
@@ -51,7 +51,7 @@ const MCP_TOOLS = [
         authorization: {
           type: 'string',
           description:
-            'Base64-encoded EIP-3009 TransferWithAuthorization Bearer token (payTo: 0xAB745e5F576667037696e78ba7dA28E193E4423D, value: 10000, chainId: 8453).',
+            `Base64-encoded EIP-3009 TransferWithAuthorization Bearer token (payTo: ${EXPECTED_PAYEE}, value: 10000, chainId: 8453).`,
         },
       },
       required: ['parcel_id'],

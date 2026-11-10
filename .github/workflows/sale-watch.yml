@@ -28,7 +28,8 @@ jobs:
       - name: Poll Base Mainnet USDC Transfers & Update LIVE_LEDGER.md
         env:
           BASE_RPC_URL: ${{ secrets.BASE_RPC_URL || 'https://mainnet.base.org' }}
-          NEXT_PUBLIC_PAY_TO_ADDRESS: '0xAB745e5F576667037696e78ba7dA28E193E4423D'
+          X402_PAY_TO: '0x0d25A44f74868eCE53B305C97139CF4B62963410'
+          NEXT_PUBLIC_PAY_TO_ADDRESS: '0x0d25A44f74868eCE53B305C97139CF4B62963410'
           SALE_WATCH_MAX_BLOCKS_PER_RUN: '30000'
         run: npx tsx scripts/sale-watch.ts
       - name: Commit & Push Ledger Updates

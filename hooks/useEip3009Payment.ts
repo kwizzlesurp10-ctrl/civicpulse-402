@@ -4,9 +4,11 @@ import { useState, useCallback } from 'react';
 import { useAccount, useSignTypedData, useSwitchChain } from 'wagmi';
 import { base } from 'viem/chains';
 import { toHex, type Address, type Hex } from 'viem';
+import { DEFAULT_X402_PAY_TO } from '../lib/x402PayTo';
 
 export const BASE_USDC_ADDRESS: Address = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
-export const DEFAULT_RECIPIENT: Address = '0xAB745e5F576667037696e78ba7dA28E193E4423D';
+export const DEFAULT_RECIPIENT: Address =
+  (process.env.NEXT_PUBLIC_PAY_TO_ADDRESS as Address | undefined) ?? DEFAULT_X402_PAY_TO;
 
 export const usdcDomain = {
   name: 'USD Coin',

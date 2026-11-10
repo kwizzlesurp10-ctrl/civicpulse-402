@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useTransition } from 'react';
+import { DEFAULT_X402_PAY_TO } from '@/lib/x402PayTo';
 
 interface Endpoint {
   id: string;
@@ -37,7 +38,9 @@ const ENDPOINTS: Endpoint[] = [
 export default function CivicPulseHome() {
   const [selectedEndpoint, setSelectedEndpoint] = useState<Endpoint>(ENDPOINTS[0]);
   const [targetQuery, setTargetQuery] = useState(ENDPOINTS[0].sampleQuery);
-  const [walletAddress] = useState<string>('0xAB745e5F576667037696e78ba7dA28E193E4423D');
+  const [walletAddress] = useState<string>(
+    process.env.NEXT_PUBLIC_PAY_TO_ADDRESS ?? DEFAULT_X402_PAY_TO
+  );
   const [consoleOutput, setConsoleOutput] = useState<string | null>(null);
   const [httpStatus, setHttpStatus] = useState<string>('IDLE');
   const [isPending, startTransition] = useTransition();

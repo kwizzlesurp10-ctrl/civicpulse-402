@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { type Hex, type Address } from 'viem';
+import { EXPECTED_PAYEE } from './x402PayTo';
 
 export interface LedgerEntry {
   timestamp: string;
@@ -19,7 +20,7 @@ const LEDGER_HEADER = `# LIVE SETTLEMENT LEDGER (CivicPulse 402 — Base Mainnet
 
 Publicly verifiable, append-only record of autonomous x402 USDC settlements on Base Mainnet (\`eip155:8453\`).
 - **Token Contract**: \`0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913\` (Native Base USDC)
-- **Verified Payee**: \`0xAB745e5F576667037696e78ba7dA28E193E4423D\`
+- **Verified Payee**: \`${EXPECTED_PAYEE}\`
 
 | Timestamp (UTC) | Endpoint | Query | Payer | Amount | BaseScan Tx | Block |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
