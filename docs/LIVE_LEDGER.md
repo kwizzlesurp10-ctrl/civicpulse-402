@@ -9,3 +9,4 @@ Network: `eip155:8453` (Base Mainnet)
 
 | Timestamp (UTC) | Block | Tx Hash | From | Amount (USDC) | Type | BaseScan |
 |---|---|---|---|---|---|---|
+| 2026-11-11T03:28:36.000Z | 55886704 | [0xcc4306b4...39f18bfd](https://basescan.org/tx/0xcc4306b448b4b93ae5d0fbebb31d9871bbebb5917512e97f300abf9a39f18bfd) | `0xA19F621581DBc851a21D6179868111709a52aCCC` | 0.010000 | TransferWithAuthorization | [View](https://basescan.org/tx/0xcc4306b448b4b93ae5d0fbebb31d9871bbebb5917512e97f300abf9a39f18bfd) |
