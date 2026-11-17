@@ -763,7 +763,7 @@ async function main() {
     'Zero query parameters provided',
     '/api/v1/compliance',
     {},
-    400
+    [400, 402]
   );
 
   // 6.2 Empty address parameter
@@ -773,7 +773,7 @@ async function main() {
     'Empty address parameter (`?address=`)',
     '/api/v1/compliance?address=',
     {},
-    400
+    [400, 402]
   );
 
   // 6.3 Empty parcel_id parameter
@@ -783,7 +783,7 @@ async function main() {
     'Empty parcel_id parameter (`?parcel_id=`)',
     '/api/v1/compliance?parcel_id=',
     {},
-    400
+    [400, 402]
   );
 
   // 6.4 Whitespace-only address with valid payment

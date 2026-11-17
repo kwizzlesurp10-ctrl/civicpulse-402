@@ -1,0 +1,167 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "CivicPulse 402 Municipal Compliance Gateway",
+    "version": "1.2.0",
+    "description": "Real-time City of Minneapolis housing code violations, building permits, and Ramsey County parcel GIS audits monetized via Base Mainnet USDC ($0.01 / 10000 atomic units) x402 EIP-3009 micropayments.",
+    "contact": {
+      "name": "Keith Walter",
+      "email": "kwizzlesurp10@gmail.com",
+      "url": "https://github.com/kwizzlesurp10-ctrl/x402-mcp"
+    },
+    "x-guidance": "Query Minneapolis housing violations and building permits by passing { \"address\": \"1700 Penn Ave N\", \"jurisdiction\": \"minneapolis\" }, or audit Ramsey County parcels by passing { \"parcel_id\": \"04-29-23-41-0012\", \"jurisdiction\": \"ramsey\" }. Unauthenticated requests return HTTP 402 with Base USDC (eip155:8453) payment terms ($0.01 / 10000 units to 0x0d25A44f74868eCE53B305C97139CF4B62963410) in both PAYMENT-REQUIRED and WWW-Authenticate headers."
+  },
+  "servers": [
+    {
+      "url": "https://civicpulse.kwizzlesurp.com",
+      "description": "Custom Domain Gateway (kwizzlesurp.com)"
+    },
+    {
+      "url": "https://civicpulse-402.vercel.app",
+      "description": "Primary Vercel Edge Gateway"
+    },
+    {
+      "url": "https://mcp.kwizzlesurp.com",
+      "description": "Custom Domain Render Backend"
+    },
+    {
+      "url": "https://x402-mcp.onrender.com",
+      "description": "Canonical Render Settlement Backend"
+    }
+  ],
+  "paths": {
+    "/api/v1/compliance": {
+      "post": {
+        "operationId": "queryCompliancePost",
+        "summary": "Query municipal housing violations, building permits, or parcel GIS records",
+        "description": "Fetches real-time Minneapolis housing code violations & building permits or Ramsey County parcel attributes. Costs 0.01 USDC (10000 atomic units) on Base Mainnet (eip155:8453) via x402 EIP-3009.",
+        "x-payment-info": {
+          "price": {
+            "mode": "fixed",
+            "currency": "USD",
+            "amount": "0.01"
+          },
+          "protocols": [
+            {
+              "x402": {}
+            }
+          ]
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "description": "Minneapolis street address (e.g., '1700 Penn Ave N')"
+                  },
+                  "parcel_id": {
+                    "type": "string",
+                    "description": "Ramsey County PIN (e.g., '04-29-23-41-0012') or site address"
+                  },
+                  "jurisdiction": {
+                    "type": "string",
+                    "enum": ["minneapolis", "ramsey"],
+                    "default": "minneapolis",
+                    "description": "Target municipality or county jurisdiction"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verified municipal compliance and parcel GIS payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string" },
+                    "settled": { "type": "boolean" },
+                    "tx_hash": { "type": ["string", "null"] },
+                    "network": { "type": "string" },
+                    "data": { "type": "object" }
+                  },
+                  "required": ["status", "data"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing address or parcel_id parameter after payment verification"
+          },
+          "402": {
+            "description": "Payment Required — Base USDC ($0.01 / 10000 atomic units) x402 challenge"
+          },
+          "403": {
+            "description": "Payment Signature Invalid"
+          }
+        }
+      },
+      "get": {
+        "operationId": "queryComplianceGet",
+        "summary": "Query municipal housing violations, building permits, or parcel GIS records (GET)",
+        "description": "GET variant of the CivicPulse 402 compliance endpoint. Costs 0.01 USDC on Base Mainnet via x402.",
+        "x-payment-info": {
+          "price": {
+            "mode": "fixed",
+            "currency": "USD",
+            "amount": "0.01"
+          },
+          "protocols": [
+            {
+              "x402": {}
+            }
+          ]
+        },
+        "parameters": [
+          {
+            "name": "address",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "Minneapolis street address (e.g., '1700 Penn Ave N')"
+          },
+          {
+            "name": "parcel_id",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "Ramsey County PIN (e.g., '04-29-23-41-0012') or site address"
+          },
+          {
+            "name": "jurisdiction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["minneapolis", "ramsey"],
+              "default": "minneapolis"
+            },
+            "description": "Target municipal jurisdiction"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verified municipal compliance and parcel GIS payload"
+          },
+          "400": {
+            "description": "Missing address or parcel_id parameter after payment verification"
+          },
+          "402": {
+            "description": "Payment Required — Base USDC ($0.01 / 10000 atomic units) x402 challenge"
+          },
+          "403": {
+            "description": "Payment Signature Invalid"
+          }
+        }
+      }
+    }
+  }
+}

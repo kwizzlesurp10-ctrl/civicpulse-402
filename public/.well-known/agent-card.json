@@ -1,0 +1,41 @@
+{
+  "name": "CivicPulse 402 Municipal Compliance Gateway",
+  "description": "Autonomous Minnesota municipal housing code violations, building permits, and Ramsey County parcel GIS audits monetized via Base USDC ($0.01) x402 micropayments.",
+  "url": "https://civicpulse-402.vercel.app",
+  "version": "1.2.0",
+  "provider": {
+    "organization": "SEVTECH / kwizzlesurp10-ctrl",
+    "url": "https://github.com/kwizzlesurp10-ctrl/x402-mcp"
+  },
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "stateTransitionHistory": false
+  },
+  "defaultInputModes": ["application/json", "text/plain"],
+  "defaultOutputModes": ["application/json"],
+  "x402Support": true,
+  "x402": {
+    "network": "eip155:8453",
+    "chainId": 8453,
+    "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "payTo": "0x0d25A44f74868eCE53B305C97139CF4B62963410",
+    "amount": "10000",
+    "currency": "USDC",
+    "priceDisplay": "$0.01"
+  },
+  "skills": [
+    {
+      "id": "query_minneapolis_compliance",
+      "name": "Minneapolis Housing Violations & Permits",
+      "description": "Look up City of Minneapolis housing code violations, active repair orders, and building permits by street address ($0.01 USDC on Base).",
+      "tags": ["minneapolis", "housing", "violations", "permits", "compliance", "x402"]
+    },
+    {
+      "id": "query_ramsey_parcel_audit",
+      "name": "Ramsey County Parcel GIS Audit",
+      "description": "Look up Ramsey County Open GIS parcel ownership, property use class, and tax assessment valuation by PIN or site address ($0.01 USDC on Base).",
+      "tags": ["ramsey", "gis", "parcel", "real-estate", "x402"]
+    }
+  ]
+}

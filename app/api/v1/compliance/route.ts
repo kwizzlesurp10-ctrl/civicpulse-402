@@ -54,7 +54,39 @@ export interface EIP3009Payload {
   validBefore: number | string;
   nonce: Hex;
   signature: Hex;
+  type?: 'TransferWithAuthorization' | 'ReceiveWithAuthorization';
   primaryType?: 'TransferWithAuthorization' | 'ReceiveWithAuthorization';
+}
+
+function parseAuthorizationToken(rawHeader: string): EIP3009Payload {
+  const trimmed = rawHeader.trim();
+  let parsed: any;
+
+  if (trimmed.startsWith('Bearer ') || trimmed.startsWith('x402 ')) {
+    const token = trimmed.split(/\s+/)[1];
+    parsed = JSON.parse(Buffer.from(token, 'base64').toString('utf-8'));
+  } else if (trimmed.startsWith('{')) {
+    parsed = JSON.parse(trimmed);
+  } else if (!trimmed.includes(' ')) {
+    parsed = JSON.parse(Buffer.from(trimmed, 'base64').toString('utf-8'));
+  } else {
+    throw new Error('Unsupported authorization header scheme.');
+  }
+
+  // Unwrap x402 v2 PaymentPayload envelope when supplied via PAYMENT-SIGNATURE
+  if (
+    parsed &&
+    typeof parsed === 'object' &&
+    parsed.payload?.authorization &&
+    parsed.payload?.signature
+  ) {
+    return {
+      ...parsed.payload.authorization,
+      signature: parsed.payload.signature,
+    } as EIP3009Payload;
+  }
+
+  return parsed as EIP3009Payload;
 }
 
 export async function verifyEIP3009Authorization(
@@ -67,17 +99,13 @@ export async function verifyEIP3009Authorization(
   error?: string;
 }> {
   try {
-    let payload: EIP3009Payload;
-
-    if (rawHeader.startsWith('Bearer ') || rawHeader.startsWith('x402 ')) {
-      const token = rawHeader.split(' ')[1];
-      payload = JSON.parse(Buffer.from(token, 'base64').toString('utf-8')) as EIP3009Payload;
-    } else {
-      payload = JSON.parse(rawHeader) as EIP3009Payload;
+    const payload = parseAuthorizationToken(rawHeader);
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      return { valid: false, error: 'Malformed EIP-3009 payload structure.' };
     }
 
     const { from, to, value, validAfter, validBefore, nonce, signature } = payload;
-    const primaryType = payload.primaryType || 'TransferWithAuthorization';
+    const primaryType = payload.type || payload.primaryType || 'TransferWithAuthorization';
 
     if (!isAddress(from) || !isAddress(to) || !signature || !nonce) {
       return { valid: false, error: 'Malformed EIP-3009 payload structure.' };
@@ -109,6 +137,15 @@ export async function verifyEIP3009Authorization(
     const validAfterNum = Number(validAfter);
     const validBeforeNum = Number(validBefore);
 
+    if (Number.isNaN(validAfterNum) || Number.isNaN(validBeforeNum)) {
+      return { valid: false, error: 'Invalid timestamp format in authorization.' };
+    }
+    if (validAfterNum >= validBeforeNum) {
+      return {
+        valid: false,
+        error: 'Invalid authorization window: validAfter must be strictly less than validBefore.',
+      };
+    }
     if (now <= validAfterNum) {
       return { valid: false, error: 'Authorization signature is not yet active.' };
     }
@@ -235,48 +272,175 @@ async function fetchRamseyData(parcelOrAddress: string) {
   }
 }
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const jurisdiction = (searchParams.get('jurisdiction') || 'minneapolis').toLowerCase();
-  const address = searchParams.get('address');
-  const parcelId = searchParams.get('parcel_id');
+interface ComplianceInput {
+  address: string | null;
+  parcelId: string | null;
+  jurisdiction: string;
+}
 
-  if (!address && !parcelId) {
-    return NextResponse.json(
-      { error: 'Missing query parameters: supply `address` or `parcel_id`.' },
-      { status: 400 }
-    );
-  }
+function buildPaymentRequiredPayload(method: 'GET' | 'POST') {
+  const inputParamsSchema = {
+    type: 'object',
+    properties: {
+      address: {
+        type: 'string',
+        description: "Minneapolis street address (e.g., '1700 Penn Ave N')",
+      },
+      parcel_id: {
+        type: 'string',
+        description: "Ramsey County PIN or site address (e.g., '04-29-23-41-0012')",
+      },
+      jurisdiction: {
+        type: 'string',
+        enum: ['minneapolis', 'ramsey'],
+        description: 'Target municipal jurisdiction',
+      },
+    },
+    additionalProperties: false,
+  };
 
+  return {
+    x402Version: 2,
+    error: 'Payment Required',
+    resource: {
+      url: 'https://civicpulse-402.vercel.app/api/v1/compliance',
+      description:
+        'Real-time Minneapolis housing code violations, permits, and Ramsey County parcel GIS audits',
+      mimeType: 'application/json',
+      serviceName: 'CivicPulse-402',
+      tags: ['compliance', 'gis', 'minneapolis', 'ramsey', 'real-estate'],
+    },
+    accepts: [
+      {
+        scheme: 'exact',
+        network: 'eip155:8453',
+        amount: REQUIRED_AMOUNT_USDC_UNITS.toString(),
+        asset: BASE_USDC_ADDRESS,
+        payTo: EXPECTED_PAYEE,
+        maxTimeoutSeconds: 300,
+        extra: {
+          name: 'USD Coin',
+          version: '2',
+        },
+      },
+    ],
+    extensions: {
+      bazaar: {
+        info: {
+          input:
+            method === 'POST'
+              ? {
+                  type: 'http',
+                  method: 'POST',
+                  bodyType: 'json',
+                  body: {
+                    address: '1700 Penn Ave N',
+                    jurisdiction: 'minneapolis',
+                  },
+                }
+              : {
+                  type: 'http',
+                  method: 'GET',
+                  queryParams: {
+                    address: '1700 Penn Ave N',
+                    jurisdiction: 'minneapolis',
+                  },
+                },
+          output: {
+            type: 'json',
+            example: {
+              status: 'OK',
+              settled: false,
+              network: 'Base Mainnet (eip155:8453)',
+              data: {
+                violations: [],
+                permits: [],
+              },
+            },
+          },
+        },
+        schema: {
+          $schema: 'https://json-schema.org/draft/2020-12/schema',
+          type: 'object',
+          properties: {
+            input: {
+              type: 'object',
+              properties: {
+                type: { type: 'string', const: 'http' },
+                method: { type: 'string', enum: ['GET', 'POST'] },
+                ...(method === 'POST'
+                  ? {
+                      bodyType: { type: 'string', const: 'json' },
+                      body: inputParamsSchema,
+                    }
+                  : {
+                      queryParams: inputParamsSchema,
+                    }),
+              },
+              required: ['type', 'method'],
+              additionalProperties: true,
+            },
+            output: {
+              type: 'object',
+              properties: {
+                status: { type: 'string' },
+                network: { type: 'string' },
+                data: { type: 'object' },
+              },
+              required: ['status', 'data'],
+            },
+          },
+          required: ['input'],
+        },
+      },
+    },
+  };
+}
+
+function buildPaymentRequiredResponse(method: 'GET' | 'POST') {
+  const v2Payload = buildPaymentRequiredPayload(method);
+  const encodedPaymentRequired = Buffer.from(JSON.stringify(v2Payload), 'utf-8').toString('base64');
+
+  return NextResponse.json(
+    {
+      protocol: 'x402-mcp/v1.2',
+      ...v2Payload,
+      amount_due: '0.01 USDC (10000 units)',
+      amount_due_units: REQUIRED_AMOUNT_USDC_UNITS.toString(),
+      chain_id: 8453,
+      token_contract: BASE_USDC_ADDRESS,
+      pay_to: EXPECTED_PAYEE,
+      eip3009: {
+        domain: usdcDomain,
+        types: { TransferWithAuthorization: eip3009Types.TransferWithAuthorization },
+        primaryType: 'TransferWithAuthorization',
+      },
+    },
+    {
+      status: 402,
+      headers: {
+        'PAYMENT-REQUIRED': encodedPaymentRequired,
+        'WWW-Authenticate': `x402 realm="CivicPulse-Base", token="USDC", contract="${BASE_USDC_ADDRESS}", chain="8453", payTo="${EXPECTED_PAYEE}", amount="10000"`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+}
+
+async function handleComplianceRequest(
+  request: NextRequest,
+  method: 'GET' | 'POST',
+  input: ComplianceInput
+) {
   const authHeader =
+    request.headers.get('payment-signature') ||
     request.headers.get('authorization') ||
     request.headers.get('x-payment-signature') ||
     request.headers.get('x402-authorization');
 
+  // Always issue HTTP 402 challenge BEFORE input validation so automated discovery probes succeed
   if (!authHeader) {
-    return NextResponse.json(
-      {
-        protocol: 'x402-mcp/v1.2',
-        error: 'Payment Required',
-        amount_due: '0.01 USDC (10000 units)',
-        amount_due_units: '10000',
-        chain_id: 8453,
-        token_contract: BASE_USDC_ADDRESS,
-        pay_to: EXPECTED_PAYEE,
-        eip3009: {
-          domain: usdcDomain,
-          types: { TransferWithAuthorization: eip3009Types.TransferWithAuthorization },
-          primaryType: 'TransferWithAuthorization',
-        },
-      },
-      {
-        status: 402,
-        headers: {
-          'WWW-Authenticate': `x402 realm="CivicPulse-Base", token="USDC", contract="${BASE_USDC_ADDRESS}", chain="8453", payTo="${EXPECTED_PAYEE}", amount="10000"`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    return buildPaymentRequiredResponse(method);
   }
 
   const verification = await verifyEIP3009Authorization(authHeader);
@@ -285,6 +449,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       { error: 'Payment Signature Invalid', details: verification.error },
       { status: 403 }
+    );
+  }
+
+  const { address, parcelId, jurisdiction } = input;
+  if (!address && !parcelId) {
+    return NextResponse.json(
+      { error: 'Missing query parameters: supply `address` or `parcel_id`.' },
+      { status: 400 }
     );
   }
 
@@ -369,4 +541,32 @@ export async function GET(request: NextRequest) {
       { status: 502 }
     );
   }
+}
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  return handleComplianceRequest(request, 'GET', {
+    address: searchParams.get('address'),
+    parcelId: searchParams.get('parcel_id'),
+    jurisdiction: (searchParams.get('jurisdiction') || 'minneapolis').toLowerCase(),
+  });
+}
+
+export async function POST(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const body = await request.json().catch(() => ({}));
+  const address =
+    typeof body?.address === 'string' ? body.address : searchParams.get('address');
+  const parcelId =
+    typeof body?.parcel_id === 'string' ? body.parcel_id : searchParams.get('parcel_id');
+  const jurisdictionRaw =
+    typeof body?.jurisdiction === 'string'
+      ? body.jurisdiction
+      : searchParams.get('jurisdiction') || 'minneapolis';
+
+  return handleComplianceRequest(request, 'POST', {
+    address: address ?? null,
+    parcelId: parcelId ?? null,
+    jurisdiction: jurisdictionRaw.toLowerCase(),
+  });
 }

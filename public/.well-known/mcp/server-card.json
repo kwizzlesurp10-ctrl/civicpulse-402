@@ -1,0 +1,77 @@
+{
+  "serverInfo": {
+    "name": "io.github.kwizzlesurp10-ctrl/x402-mcp",
+    "title": "CivicPulse 402 Municipal Compliance Gateway",
+    "version": "1.2.0",
+    "description": "Real-time Minneapolis housing code violations, building permits, and Ramsey County parcel GIS audits via Base USDC ($0.01) x402."
+  },
+  "transport": {
+    "type": "streamable-http",
+    "endpoint": "https://civicpulse-402.vercel.app/mcp"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://civicpulse-402.vercel.app/mcp"
+    },
+    {
+      "type": "streamable-http",
+      "url": "https://x402-mcp.onrender.com/mcp"
+    }
+  ],
+  "capabilities": {
+    "tools": {
+      "listChanged": false
+    }
+  },
+  "tools": [
+    {
+      "name": "query_minneapolis_compliance",
+      "description": "Fetches real-time City of Minneapolis housing code violations, active repair orders, and building permits for a street address via ArcGIS Open Data. Costs 0.01 USDC on Base via x402.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "Minneapolis street address (e.g., '1700 Penn Ave N')"
+          },
+          "authorization": {
+            "type": "string",
+            "description": "Optional Base64 EIP-3009 Bearer token"
+          }
+        },
+        "required": ["address"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "query_ramsey_parcel_audit",
+      "description": "Queries Ramsey County Open GIS for parcel attributes, registered owner, property use class, and tax assessment valuation by PIN or site address. Costs 0.01 USDC on Base via x402.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parcel_id": {
+            "type": "string",
+            "description": "Ramsey County PIN (e.g., '04-29-23-41-0012') or address"
+          },
+          "authorization": {
+            "type": "string",
+            "description": "Optional Base64 EIP-3009 Bearer token"
+          }
+        },
+        "required": ["parcel_id"],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "x402": {
+    "version": "2",
+    "network": "eip155:8453",
+    "chainId": 8453,
+    "token": "USDC",
+    "tokenContract": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "payTo": "0x0d25A44f74868eCE53B305C97139CF4B62963410",
+    "priceUnits": "10000",
+    "priceFormatted": "0.01 USDC"
+  }
+}

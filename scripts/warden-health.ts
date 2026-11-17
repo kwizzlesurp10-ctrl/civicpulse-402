@@ -78,10 +78,17 @@ async function runWardenAudit() {
   // 3. Verify server.json (Official MCP Registry Standard - Post-Smithery Proxy Cutover)
   const serverRaw = await fs.readFile(path.join(process.cwd(), 'server.json'), 'utf-8');
   const serverJson = JSON.parse(serverRaw);
-  const srvPayTo = getAddress(serverJson.x402?.payTo || '');
-  const srvChain = Number(serverJson.x402?.chainId);
-  const srvNetwork = String(serverJson.x402?.network || '');
-  const srvContract = getAddress(serverJson.x402?.tokenContract || '');
+  const serverX402 =
+    serverJson._meta?.['io.modelcontextprotocol.registry/publisher-provided']?.x402;
+  assert.strictEqual(
+    serverJson.x402,
+    undefined,
+    'server.json must not expose top-level x402 outside _meta'
+  );
+  const srvPayTo = getAddress(serverX402?.payTo || '');
+  const srvChain = Number(serverX402?.chainId);
+  const srvNetwork = String(serverX402?.network || '');
+  const srvContract = getAddress(serverX402?.tokenContract || '');
 
   assert.strictEqual(srvPayTo, CANONICAL_PAY_TO, 'server.json payTo mismatch');
   assert.strictEqual(srvChain, CANONICAL_CHAIN_ID, 'server.json chainId != 8453');

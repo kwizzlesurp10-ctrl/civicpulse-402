@@ -9,12 +9,26 @@
         { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS" },
         {
           "key": "Access-Control-Allow-Headers",
-          "value": "Authorization, x402-authorization, x-payment-signature, Content-Type, Mcp-Session-Id"
+          "value": "Authorization, payment-signature, x402-authorization, x-payment-signature, Content-Type, Mcp-Session-Id"
         },
         {
           "key": "Access-Control-Expose-Headers",
-          "value": "WWW-Authenticate, X-Verified-Payer, X-Settlement-Tx"
+          "value": "WWW-Authenticate, PAYMENT-REQUIRED, PAYMENT-RESPONSE, X-Verified-Payer, X-Settlement-Tx"
         }
+      ]
+    },
+    {
+      "source": "/.well-known/x402",
+      "headers": [
+        { "key": "Content-Type", "value": "application/json; charset=utf-8" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" }
+      ]
+    },
+    {
+      "source": "/.well-known/api-catalog",
+      "headers": [
+        { "key": "Content-Type", "value": "application/linkset+json; charset=utf-8" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" }
       ]
     }
   ]

@@ -11,8 +11,9 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers':
-    'Content-Type, Authorization, x402-authorization, x-payment-signature, Mcp-Session-Id',
-  'Access-Control-Expose-Headers': 'WWW-Authenticate, X-Verified-Payer, X-Settlement-Tx',
+    'Content-Type, Authorization, payment-signature, x402-authorization, x-payment-signature, Mcp-Session-Id',
+  'Access-Control-Expose-Headers':
+    'WWW-Authenticate, PAYMENT-REQUIRED, PAYMENT-RESPONSE, X-Verified-Payer, X-Settlement-Tx',
 };
 
 const MCP_TOOLS = [
@@ -144,8 +145,10 @@ export async function POST(request: NextRequest) {
     const toolName = params?.name;
     const toolArgs = params?.arguments || {};
 
+    const paymentSignatureHeader = request.headers.get('payment-signature') || '';
     const headerAuth =
       toolArgs.authorization ||
+      paymentSignatureHeader ||
       request.headers.get('authorization') ||
       request.headers.get('x402-authorization') ||
       request.headers.get('x-payment-signature') ||
@@ -169,7 +172,11 @@ export async function POST(request: NextRequest) {
 
     const requestHeaders: Record<string, string> = { Accept: 'application/json' };
     if (headerAuth) {
-      requestHeaders['Authorization'] = headerAuth;
+      if (paymentSignatureHeader && !toolArgs.authorization) {
+        requestHeaders['payment-signature'] = headerAuth;
+      } else {
+        requestHeaders['Authorization'] = headerAuth;
+      }
     }
 
     const originUrl = new URL(request.url).origin;
@@ -177,6 +184,7 @@ export async function POST(request: NextRequest) {
 
     const apiRes = await fetch(localEndpoint, { headers: requestHeaders });
     const wwwAuth = apiRes.headers.get('www-authenticate') || '';
+    const paymentRequired = apiRes.headers.get('payment-required') || '';
     const responsePayload = await apiRes.json().catch(() => ({}));
 
     return NextResponse.json(
@@ -192,6 +200,7 @@ export async function POST(request: NextRequest) {
                 {
                   httpStatus: apiRes.status,
                   ...(wwwAuth ? { wwwAuthenticate: wwwAuth } : {}),
+                  ...(paymentRequired ? { paymentRequired } : {}),
                   ...responsePayload,
                 },
                 null,
@@ -206,6 +215,9 @@ export async function POST(request: NextRequest) {
         headers: {
           ...CORS_HEADERS,
           ...(wwwAuth ? { 'WWW-Authenticate': wwwAuth } : {}),
+          ...(apiRes.status === 402 && paymentRequired
+            ? { 'PAYMENT-REQUIRED': paymentRequired }
+            : {}),
         },
       }
     );

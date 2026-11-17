@@ -1,0 +1,25 @@
+# CivicPulse 402 Municipal Compliance Gateway
+
+> Real-time City of Minneapolis housing code violations, building permits, and Ramsey County parcel GIS audits priced at **$0.01 USDC** (`10000` atomic units) per query via **x402** on **Base Mainnet** (`eip155:8453`).
+
+## Payment Parameters
+- **Network**: Base Mainnet (`eip155:8453`, Chain ID `8453`)
+- **Asset**: Native Base USDC (`0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`, 6 decimals)
+- **Payee (`payTo`)**: `0x0d25A44f74868eCE53B305C97139CF4B62963410`
+- **Price**: `10000` units (`0.01 USDC`)
+- **Scheme**: `exact` / EIP-3009 (`TransferWithAuthorization` or `ReceiveWithAuthorization`)
+
+## HTTP Endpoints
+- `POST https://civicpulse-402.vercel.app/api/v1/compliance` — JSON body `{ "address": "1700 Penn Ave N", "jurisdiction": "minneapolis" }` or `{ "parcel_id": "04-29-23-41-0012", "jurisdiction": "ramsey" }`
+- `GET https://civicpulse-402.vercel.app/api/v1/compliance?address=1700+Penn+Ave+N&jurisdiction=minneapolis`
+- `POST https://civicpulse-402.vercel.app/mcp` — Streamable HTTP MCP endpoint (`query_minneapolis_compliance`, `query_ramsey_parcel_audit`)
+
+## Machine Discovery Endpoints
+- [OpenAPI 3.1 Spec](https://civicpulse-402.vercel.app/openapi.json)
+- [x402 Discovery Manifest](https://civicpulse-402.vercel.app/.well-known/x402)
+- [RFC 9727 API Catalog](https://civicpulse-402.vercel.app/.well-known/api-catalog)
+- [MCP Server Card (SEP-1649)](https://civicpulse-402.vercel.app/.well-known/mcp/server-card.json)
+- [MCP Manifest](https://civicpulse-402.vercel.app/.well-known/mcp.json)
+- [A2A Agent Card](https://civicpulse-402.vercel.app/.well-known/agent-card.json)
+- [ERC-8004 Registration Manifest](https://civicpulse-402.vercel.app/.well-known/erc8004.json)
+- [Official MCP Registry Server Metadata](https://civicpulse-402.vercel.app/server.json)

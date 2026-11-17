@@ -1,9 +1,14 @@
 import assert from 'node:assert';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { NextRequest } from 'next/server';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { toHex } from 'viem';
 import { parse402Header } from '../lib/x402Fetch';
 import { getAddress } from 'viem';
 import {
+  GET,
+  POST,
   verifyEIP3009Authorization,
   BASE_USDC_ADDRESS,
   EXPECTED_PAYEE,
@@ -163,6 +168,83 @@ async function runTests() {
   assert.strictEqual(futureResult.valid, false);
   assert.match(futureResult.error || '', /not yet active/i);
   console.log(`   [PASS] Future validAfter rejected: ${futureResult.error}`);
+
+  console.log('6. Testing 402-before-400 probe behavior & v2 PAYMENT-REQUIRED Bazaar headers...');
+  const getProbeRes = await GET(new NextRequest('https://civicpulse-402.vercel.app/api/v1/compliance'));
+  assert.strictEqual(getProbeRes.status, 402, 'GET without params or payment must return 402 before 400');
+  const getPrHeader = getProbeRes.headers.get('payment-required');
+  assert(getPrHeader, 'GET 402 response must include PAYMENT-REQUIRED header');
+  const getPrJson = JSON.parse(Buffer.from(getPrHeader, 'base64').toString('utf-8'));
+  assert.strictEqual(getPrJson.x402Version, 2);
+  assert.strictEqual(getPrJson.resource.serviceName, 'CivicPulse-402');
+  assert.strictEqual(getPrJson.resource.tags.length, 5);
+  assert.strictEqual(getPrJson.accepts[0].amount, '10000');
+  assert.strictEqual(getPrJson.accepts[0].payTo, EXPECTED_PAYEE);
+  assert.strictEqual(getPrJson.extensions.bazaar.info.input.method, 'GET');
+
+  const postProbeRes = await POST(
+    new NextRequest('https://civicpulse-402.vercel.app/api/v1/compliance', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    })
+  );
+  assert.strictEqual(postProbeRes.status, 402, 'POST without params or payment must return 402 before 400');
+  const postPrHeader = postProbeRes.headers.get('payment-required');
+  assert(postPrHeader, 'POST 402 response must include PAYMENT-REQUIRED header');
+  const postPrJson = JSON.parse(Buffer.from(postPrHeader, 'base64').toString('utf-8'));
+  assert.strictEqual(postPrJson.extensions.bazaar.info.input.method, 'POST');
+  console.log('   [PASS] GET & POST return 402-before-400 with valid v2 PAYMENT-REQUIRED Bazaar headers.');
+
+  console.log('7. Testing x402 v2 PAYMENT-SIGNATURE PaymentPayload unwrapping...');
+  const v2Envelope = {
+    x402Version: 2,
+    accepted: getPrJson.accepts[0],
+    payload: {
+      authorization: {
+        from: account.address,
+        to: EXPECTED_PAYEE,
+        value: value.toString(),
+        validAfter,
+        validBefore,
+        nonce,
+      },
+      signature,
+    },
+  };
+  const v2Header = Buffer.from(JSON.stringify(v2Envelope)).toString('base64');
+  const v2Result = await verifyEIP3009Authorization(v2Header, true);
+  assert.strictEqual(v2Result.valid, true, `Expected valid v2 PAYMENT-SIGNATURE, got: ${v2Result.error}`);
+  console.log('   [PASS] x402 v2 PAYMENT-SIGNATURE payload verified successfully.');
+
+  console.log('8. Testing discovery manifest JSON validity & server.json _meta compliance...');
+  const jsonManifests = [
+    'public/openapi.json',
+    'public/.well-known/x402',
+    'public/.well-known/api-catalog',
+    'public/.well-known/mcp/server-card.json',
+    'public/.well-known/mcp.json',
+    'public/.well-known/agent-card.json',
+    'public/.well-known/erc8004.json',
+    'public/server.json',
+    'server.json',
+  ];
+  for (const relPath of jsonManifests) {
+    const raw = await fs.readFile(path.join(process.cwd(), relPath), 'utf-8');
+    JSON.parse(raw);
+  }
+  const rootServer = JSON.parse(await fs.readFile(path.join(process.cwd(), 'server.json'), 'utf-8'));
+  const pubServer = JSON.parse(await fs.readFile(path.join(process.cwd(), 'public/server.json'), 'utf-8'));
+  assert.strictEqual(rootServer.x402, undefined);
+  assert.strictEqual(pubServer.x402, undefined);
+  assert.strictEqual(
+    rootServer._meta?.['io.modelcontextprotocol.registry/publisher-provided']?.x402?.payTo,
+    EXPECTED_PAYEE
+  );
+  assert.strictEqual(
+    pubServer._meta?.['io.modelcontextprotocol.registry/publisher-provided']?.x402?.payTo,
+    EXPECTED_PAYEE
+  );
+  console.log('   [PASS] All discovery manifests parse cleanly and server.json _meta schema verified.');
 
   console.log('\nAll x402 verification & cryptographic tests passed!');
 }

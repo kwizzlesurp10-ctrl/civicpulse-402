@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "resources": [
+    "https://civicpulse.kwizzlesurp.com/api/v1/compliance",
+    "https://civicpulse-402.vercel.app/api/v1/compliance",
+    "https://x402-mcp.onrender.com/api/v1/compliance"
+  ]
+}

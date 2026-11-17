@@ -1,0 +1,46 @@
+{
+  "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+  "name": "CivicPulse 402 Municipal Compliance Gateway",
+  "description": "Real-time Minneapolis housing code violations, building permits, and Ramsey County parcel GIS audits settled in Base Mainnet USDC ($0.01 / 10000 units) via x402 EIP-3009.",
+  "services": [
+    {
+      "name": "web",
+      "endpoint": "https://civicpulse-402.vercel.app/"
+    },
+    {
+      "name": "MCP",
+      "endpoint": "https://civicpulse.kwizzlesurp.com/mcp",
+      "version": "2025-03-26"
+    },
+    {
+      "name": "MCP",
+      "endpoint": "https://civicpulse-402.vercel.app/mcp",
+      "version": "2025-03-26"
+    },
+    {
+      "name": "openapi",
+      "endpoint": "https://civicpulse.kwizzlesurp.com/openapi.json",
+      "version": "3.1.0"
+    },
+    {
+      "name": "openapi",
+      "endpoint": "https://civicpulse-402.vercel.app/openapi.json",
+      "version": "3.1.0"
+    },
+    {
+      "name": "A2A",
+      "endpoint": "https://civicpulse-402.vercel.app/.well-known/agent-card.json"
+    }
+  ],
+  "x402Support": true,
+  "active": true,
+  "supportedTrust": ["reputation", "crypto-economic"],
+  "payment": {
+    "network": "eip155:8453",
+    "chainId": 8453,
+    "tokenContract": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "payTo": "0x0d25A44f74868eCE53B305C97139CF4B62963410",
+    "amount": "10000"
+  },
+  "registrations": []
+}
