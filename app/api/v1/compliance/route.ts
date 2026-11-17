@@ -278,7 +278,7 @@ interface ComplianceInput {
   jurisdiction: string;
 }
 
-function buildPaymentRequiredPayload(method: 'GET' | 'POST') {
+function buildPaymentRequiredPayload(method: 'GET' | 'POST', resourceUrl = 'https://civicpulse.kwizzlesurp.com/api/v1/compliance') {
   const inputParamsSchema = {
     type: 'object',
     properties: {
@@ -303,7 +303,7 @@ function buildPaymentRequiredPayload(method: 'GET' | 'POST') {
     x402Version: 2,
     error: 'Payment Required',
     resource: {
-      url: 'https://civicpulse-402.vercel.app/api/v1/compliance',
+      url: resourceUrl,
       description:
         'Real-time Minneapolis housing code violations, permits, and Ramsey County parcel GIS audits',
       mimeType: 'application/json',
@@ -383,11 +383,18 @@ function buildPaymentRequiredPayload(method: 'GET' | 'POST') {
             output: {
               type: 'object',
               properties: {
-                status: { type: 'string' },
-                network: { type: 'string' },
-                data: { type: 'object' },
+                type: { type: 'string' },
+                example: {
+                  type: 'object',
+                  properties: {
+                    status: { type: 'string' },
+                    network: { type: 'string' },
+                    data: { type: 'object' },
+                  },
+                  required: ['status', 'data'],
+                },
               },
-              required: ['status', 'data'],
+              required: ['type'],
             },
           },
           required: ['input'],
@@ -397,8 +404,8 @@ function buildPaymentRequiredPayload(method: 'GET' | 'POST') {
   };
 }
 
-function buildPaymentRequiredResponse(method: 'GET' | 'POST') {
-  const v2Payload = buildPaymentRequiredPayload(method);
+function buildPaymentRequiredResponse(method: 'GET' | 'POST', resourceUrl?: string) {
+  const v2Payload = buildPaymentRequiredPayload(method, resourceUrl);
   const encodedPaymentRequired = Buffer.from(JSON.stringify(v2Payload), 'utf-8').toString('base64');
 
   return NextResponse.json(
@@ -440,7 +447,7 @@ async function handleComplianceRequest(
 
   // Always issue HTTP 402 challenge BEFORE input validation so automated discovery probes succeed
   if (!authHeader) {
-    return buildPaymentRequiredResponse(method);
+    return buildPaymentRequiredResponse(method, new URL('/api/v1/compliance', request.url).toString());
   }
 
   const verification = await verifyEIP3009Authorization(authHeader);
