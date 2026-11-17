@@ -512,6 +512,49 @@ async function handleComplianceRequest(
         { status: 402 }
       );
     }
+  } else {
+    try {
+      const resourceUrl = new URL('/api/v1/compliance', request.url).toString();
+      const v2Pr = buildPaymentRequiredPayload(method, resourceUrl);
+      const facilitatorBase = (
+        process.env.X402_FACILITATOR_URL || 'https://facilitator.payai.network'
+      ).replace(/\/$/, '');
+      const settleRes = await fetch(`${facilitatorBase}/settle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          x402Version: 2,
+          paymentPayload: {
+            x402Version: 2,
+            resource: v2Pr.resource,
+            accepted: v2Pr.accepts[0],
+            payload: {
+              signature: p.signature,
+              authorization: {
+                from: p.from,
+                to: p.to,
+                value: String(p.value),
+                validAfter: String(p.validAfter),
+                validBefore: String(p.validBefore),
+                nonce: p.nonce,
+              },
+            },
+            extensions: v2Pr.extensions,
+          },
+          paymentRequirements: v2Pr.accepts[0],
+        }),
+      });
+      const settleJson: any = await settleRes.json().catch(() => ({}));
+      const tx = settleJson?.transaction || settleJson?.txHash || settleJson?.tx_hash;
+      if (settleRes.ok && (settleJson?.success || tx)) {
+        if (tx && typeof tx === 'string' && tx.startsWith('0x')) {
+          settlementTxHash = tx as Hex;
+        }
+        settlementBlock = String(settleJson?.blockNumber || 'FACILITATOR_SETTLED');
+      }
+    } catch {
+      // Keep non-fatal fallback if external facilitator is unreachable
+    }
   }
 
   try {
@@ -538,7 +581,20 @@ async function handleComplianceRequest(
         headers: {
           'Cache-Control': 'private, no-store',
           'X-Verified-Payer': verification.signer || '',
-          ...(settlementTxHash ? { 'X-Settlement-Tx': settlementTxHash } : {}),
+          ...(settlementTxHash
+            ? {
+                'X-Settlement-Tx': settlementTxHash,
+                'PAYMENT-RESPONSE': Buffer.from(
+                  JSON.stringify({
+                    success: true,
+                    transaction: settlementTxHash,
+                    network: 'eip155:8453',
+                    payer: verification.signer || p.from,
+                  }),
+                  'utf-8'
+                ).toString('base64'),
+              }
+            : {}),
         },
       }
     );
