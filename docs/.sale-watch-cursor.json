@@ -3,7 +3,7 @@
   "chainId": 8453,
   "contractAddress": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
   "payeeAddress": "0x0d25A44f74868eCE53B305C97139CF4B62963410",
-  "lastBlock": 59103460,
-  "lastSyncedAt": "2026-11-18T14:11:24.968Z",
+  "lastBlock": 59111132,
+  "lastSyncedAt": "2026-11-18T14:36:56.888Z",
   "totalSettlementsFound": 49
 }
