@@ -1,6 +1,6 @@
 {
   "framework": "nextjs",
-  "regions": ["iad1"],
+  "regions": ["fra1"],
   "headers": [
     {
       "source": "/(api|mcp)(.*)",

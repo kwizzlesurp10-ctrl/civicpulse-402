@@ -257,6 +257,9 @@ export async function POST(request: NextRequest) {
         id,
         result: {
           isError: apiRes.status >= 400,
+          ...(apiRes.status === 402
+            ? { _meta: { 'x402/payment-required': responsePayload } }
+            : {}),
           content: [
             {
               type: 'text',
