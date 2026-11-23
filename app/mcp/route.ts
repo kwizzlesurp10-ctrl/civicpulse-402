@@ -37,6 +37,25 @@ const MCP_TOOLS = [
       required: ['address'],
       additionalProperties: false,
     },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        httpStatus: { type: 'number', description: 'Upstream compliance HTTP status code (200 or 402).' },
+        wwwAuthenticate: { type: 'string', description: 'RFC 7235 x402 challenge header when unpaid.' },
+        paymentRequired: { type: 'string', description: 'Base64 x402 v2 PAYMENT-REQUIRED challenge when unpaid.' },
+        violations: { type: 'array', description: 'Active and historical Minneapolis housing code violations.' },
+        permits: { type: 'array', description: 'Associated Minneapolis building and repair permits.' },
+        address: { type: 'string', description: 'Normalized Minneapolis street address queried.' },
+      },
+      required: ['httpStatus'],
+    },
+    annotations: {
+      title: 'Minneapolis Housing Compliance Lookup ($0.01)',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
   },
   {
     name: 'query_ramsey_parcel_audit',
@@ -58,6 +77,24 @@ const MCP_TOOLS = [
       required: ['parcel_id'],
       additionalProperties: false,
     },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        httpStatus: { type: 'number', description: 'Upstream GIS audit HTTP status code (200 or 402).' },
+        wwwAuthenticate: { type: 'string', description: 'RFC 7235 x402 challenge header when unpaid.' },
+        paymentRequired: { type: 'string', description: 'Base64 x402 v2 PAYMENT-REQUIRED challenge when unpaid.' },
+        parcel: { type: 'object', description: 'Ramsey County parcel attributes, owner, and tax valuation.' },
+        parcel_id: { type: 'string', description: 'Queried Ramsey County PIN or street address.' },
+      },
+      required: ['httpStatus'],
+    },
+    annotations: {
+      title: 'Ramsey County Parcel GIS Audit ($0.01)',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
   },
 ];
 
@@ -65,7 +102,25 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const accept = (request.headers.get('accept') || '').toLowerCase();
+  if (accept.includes('text/event-stream')) {
+    return NextResponse.json(
+      {
+        error: 'METHOD_NOT_ALLOWED',
+        message: 'Use HTTP POST with JSON-RPC 2.0 on this stateless Streamable HTTP MCP endpoint.',
+      },
+      {
+        status: 405,
+        headers: {
+          ...CORS_HEADERS,
+          Allow: 'POST, OPTIONS',
+          Vary: 'Accept',
+        },
+      }
+    );
+  }
+
   return NextResponse.json(
     {
       name: 'io.github.kwizzlesurp10-ctrl/x402-mcp',
@@ -83,9 +138,10 @@ export async function GET() {
         priceUnits: '10000',
       },
       toolsCount: MCP_TOOLS.length,
+      tools: MCP_TOOLS,
       status: 'ONLINE',
     },
-    { status: 200, headers: CORS_HEADERS }
+    { status: 200, headers: { ...CORS_HEADERS, Vary: 'Accept' } }
   );
 }
 
@@ -164,9 +220,17 @@ export async function POST(request: NextRequest) {
         {
           jsonrpc: '2.0',
           id,
-          error: { code: -32601, message: `Unknown tool: ${toolName}` },
+          result: {
+            isError: true,
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({ error: `Unknown tool: ${String(toolName ?? '')}` }),
+              },
+            ],
+          },
         },
-        { status: 404, headers: CORS_HEADERS }
+        { status: 200, headers: CORS_HEADERS }
       );
     }
 
@@ -192,7 +256,7 @@ export async function POST(request: NextRequest) {
         jsonrpc: '2.0',
         id,
         result: {
-          isError: apiRes.status >= 400 && apiRes.status !== 402,
+          isError: apiRes.status >= 400,
           content: [
             {
               type: 'text',
